@@ -15,7 +15,16 @@ interface NowPlayingRow {
   fetched_at: string | null
 }
 
+interface HistoryEntry {
+  when: string // ISO
+  stationName: string
+  track: string
+}
+
 const POLL_MS = 20_000
+const HISTORY_KEY = 'my-radio:history'
+const HISTORY_LIMIT = 50
+const VOLUME_STEP = 0.05
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T
 const statusEl = $('status')
@@ -25,9 +34,12 @@ const player = $<HTMLAudioElement>('player')
 const addForm = $<HTMLFormElement>('add-form')
 const addName = $<HTMLInputElement>('add-name')
 const addUrl = $<HTMLInputElement>('add-url')
+const historySection = $('history-section')
+const historyList = $<HTMLUListElement>('history-list')
 
 let stations: Station[] = []
 let playingId: number | null = null
+let playHistory: HistoryEntry[] = loadHistory()
 
 async function api<T = unknown>(path: string, init: RequestInit = {}): Promise<T> {
   const res = await fetch(path, {
@@ -56,9 +68,32 @@ function ago(iso: string | null): string {
   return `${Math.round(secs / 3600)}h ago`
 }
 
+let statusTimer: ReturnType<typeof setTimeout> | undefined
+
+/** Sets the status line; non-empty messages clear themselves after a few seconds. */
+function setStatus(message: string, autoClearMs = 6000): void {
+  clearTimeout(statusTimer)
+  statusEl.textContent = message
+  if (message && autoClearMs > 0) {
+    statusTimer = setTimeout(() => {
+      if (statusEl.textContent === message) statusEl.textContent = ''
+    }, autoClearMs)
+  }
+}
+
+/** Fires and forgets `<audio>.play()`, swallowing the routine "interrupted by
+ * a call to pause()" AbortError — switching stations or pausing quickly
+ * cancels the in-flight play() promise; that's expected, not a real error. */
+function safePlay(): void {
+  player.play().catch((err: unknown) => {
+    if (err instanceof DOMException && err.name === 'AbortError') return
+    setStatus(`play error: ${(err as Error).message}`)
+  })
+}
+
 function play(s: Station): void {
   player.src = s.stream_url // direct stream locally; /stream/{id} proxy comes in milestone 4
-  player.play().catch((e) => (statusEl.textContent = `play error: ${e.message}`))
+  safePlay()
   playingId = s.id
   render()
 }
@@ -71,16 +106,76 @@ function stop(): void {
   render()
 }
 
+function togglePause(): void {
+  if (player.paused) safePlay()
+  else player.pause()
+}
+
+// --- recently played (this browser session only) ---
+
+function loadHistory(): HistoryEntry[] {
+  try {
+    const raw = sessionStorage.getItem(HISTORY_KEY)
+    return raw ? (JSON.parse(raw) as HistoryEntry[]) : []
+  } catch {
+    return []
+  }
+}
+
+function saveHistory(): void {
+  try {
+    sessionStorage.setItem(HISTORY_KEY, JSON.stringify(playHistory))
+  } catch {
+    // private browsing / quota / disabled storage — history just won't persist
+  }
+}
+
+/** Appends to history when the currently-playing station's track changes. */
+function recordHistory(): void {
+  if (playingId === null) return
+  const s = stations.find((st) => st.id === playingId)
+  if (!s || s.np_status !== 'ok' || !s.np_raw) return
+
+  const last = playHistory[0]
+  if (last && last.stationName === s.name && last.track === s.np_raw) return
+
+  playHistory.unshift({ when: new Date().toISOString(), stationName: s.name, track: s.np_raw })
+  if (playHistory.length > HISTORY_LIMIT) playHistory.length = HISTORY_LIMIT
+  saveHistory()
+  renderHistory()
+}
+
+function renderHistory(): void {
+  historySection.hidden = playHistory.length === 0
+  historyList.replaceChildren(
+    ...playHistory.map((h) => {
+      const li = document.createElement('li')
+      const when = document.createElement('span')
+      when.className = 'when'
+      when.textContent = new Date(h.when).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      const entry = document.createElement('span')
+      entry.className = 'entry'
+      entry.textContent = `${h.track} — ${h.stationName}`
+      li.append(when, entry)
+      return li
+    }),
+  )
+}
+
+// --- station list ---
+
 function render(): void {
   emptyEl.hidden = stations.length > 0
   listEl.replaceChildren(
     ...stations.map((s) => {
       const li = document.createElement('li')
-      li.className = s.id === playingId ? 'playing' : ''
+      const isCurrent = s.id === playingId
+      li.className = isCurrent ? 'playing' : ''
 
       const playBtn = document.createElement('button')
-      playBtn.textContent = s.id === playingId ? '■ stop' : '▶ play'
-      playBtn.onclick = () => (s.id === playingId ? stop() : play(s))
+      const isPaused = isCurrent && player.paused
+      playBtn.textContent = isCurrent ? (isPaused ? '▶ resume' : '⏸ pause') : '▶ play'
+      playBtn.onclick = () => (isCurrent ? togglePause() : play(s))
 
       const meta = document.createElement('div')
       meta.className = 'meta'
@@ -120,7 +215,16 @@ function render(): void {
         await reloadAll()
       }
 
-      li.append(playBtn, meta, rename, del)
+      li.append(playBtn)
+      if (isCurrent) {
+        const stopBtn = document.createElement('button')
+        stopBtn.textContent = '✕'
+        stopBtn.title = 'Stop'
+        stopBtn.className = 'ghost'
+        stopBtn.onclick = () => stop()
+        li.append(stopBtn)
+      }
+      li.append(meta, rename, del)
       return li
     }),
   )
@@ -147,10 +251,11 @@ async function reloadAll(): Promise<void> {
     await loadStations()
     render()
     await loadNowPlaying()
+    recordHistory()
     render()
-    statusEl.textContent = ''
+    setStatus('')
   } catch (err) {
-    statusEl.textContent = `error: ${(err as Error).message}`
+    setStatus(`error: ${(err as Error).message}`)
   }
 }
 
@@ -158,9 +263,10 @@ async function tick(): Promise<void> {
   if (document.visibilityState !== 'visible') return
   try {
     await loadNowPlaying()
+    recordHistory()
     render()
   } catch (err) {
-    statusEl.textContent = `error: ${(err as Error).message}`
+    setStatus(`error: ${(err as Error).message}`)
   }
 }
 
@@ -175,10 +281,61 @@ addForm.onsubmit = async (e) => {
     addName.focus()
     await reloadAll()
   } catch (err) {
-    statusEl.textContent = `add failed — ${(err as Error).message}`
+    setStatus(`add failed — ${(err as Error).message}`)
   }
 }
 
+// --- hotkeys: space = play/pause, ↑/↓ = volume, ←/→ = previous/next station ---
+
+function isTypingTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false
+  return target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable
+}
+
+function playAt(index: number): void {
+  if (stations.length === 0) return
+  const wrapped = ((index % stations.length) + stations.length) % stations.length
+  play(stations[wrapped])
+}
+
+function playRelative(delta: number): void {
+  const currentIndex = stations.findIndex((s) => s.id === playingId)
+  playAt(currentIndex === -1 ? (delta > 0 ? 0 : -1) : currentIndex + delta)
+}
+
+document.addEventListener('keydown', (e) => {
+  if (isTypingTarget(e.target) || e.metaKey || e.ctrlKey || e.altKey) return
+  switch (e.code) {
+    case 'Space':
+      e.preventDefault()
+      if (!player.src) playAt(0)
+      else togglePause()
+      break
+    case 'ArrowUp':
+      e.preventDefault()
+      player.volume = Math.min(1, player.volume + VOLUME_STEP)
+      break
+    case 'ArrowDown':
+      e.preventDefault()
+      player.volume = Math.max(0, player.volume - VOLUME_STEP)
+      break
+    case 'ArrowRight':
+      e.preventDefault()
+      playRelative(1)
+      break
+    case 'ArrowLeft':
+      e.preventDefault()
+      playRelative(-1)
+      break
+  }
+})
+
+// Keep the play/pause button in sync when playback state changes for any
+// reason (hotkey, native <audio> controls, autoplay policy, etc).
+player.addEventListener('play', render)
+player.addEventListener('pause', render)
+
+renderHistory()
 void reloadAll()
 setInterval(tick, POLL_MS)
 document.addEventListener('visibilitychange', () => {
