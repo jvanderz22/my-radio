@@ -18,3 +18,6 @@ backend/static/
 # env / editor
 .env
 .DS_Store
+
+# personal scratch notes
+my-todo.txt
