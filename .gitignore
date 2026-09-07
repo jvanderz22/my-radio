@@ -1,0 +1,20 @@
+# python
+__pycache__/
+*.pyc
+.venv/
+backend/.venv/
+
+# data / db (lives on the Fly volume in prod)
+data/
+*.db
+*.db-wal
+*.db-shm
+
+# node / built frontend
+node_modules/
+frontend/dist/
+backend/static/
+
+# env / editor
+.env
+.DS_Store

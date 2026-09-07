@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>my-radio</title>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <main id="app">
+      <h1>my-radio</h1>
+      <p id="status" class="status"></p>
+
+      <form id="add-form" class="add">
+        <input id="add-name" placeholder="Station name" required />
+        <input id="add-url" type="url" placeholder="https://stream-url…" required />
+        <button type="submit">Add</button>
+      </form>
+
+      <ul id="stations" class="stations"></ul>
+      <p id="empty" class="empty" hidden>No stations yet — add one above.</p>
+
+      <audio id="player" class="player" controls preload="none"></audio>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
