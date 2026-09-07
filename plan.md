@@ -98,11 +98,14 @@ last.fm scrobbling; tags/folders; import/export OPML.
 ## Deploy (Fly)
 
 ```sh
-fly launch --no-deploy          # generates the app; keep this fly.toml
-fly volumes create radio_data --region iad --size 1
-fly scale count 1               # SQLite = single machine, always
-fly deploy
+./deploy_fly.sh
 ```
+
+Idempotent — safe to rerun on every deploy. It creates the app + volume on
+first run (skips both if they already exist), pins the machine count to 1
+(required: SQLite has one writer, and Fly volumes don't replicate), then
+`fly deploy`s. `--secret KEY=VAL` (repeatable) sets Fly secrets once auth or
+similar exists. See `./deploy_fly.sh --help`.
 
 Backups (add when it matters): Fly volume snapshots are automatic (~5-day
 retention). For continuous backup add **Litestream** replicating to Fly Tigris —

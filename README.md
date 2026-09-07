@@ -38,4 +38,9 @@ FRONTEND_DIST=../frontend/dist uvicorn app.main:app --port 8080
 
 ## Deploy
 
-See the Deploy section in [plan.md](plan.md).
+```sh
+./deploy_fly.sh
+```
+
+Reusable and idempotent — see the Deploy section in [plan.md](plan.md) or
+`./deploy_fly.sh --help` for details.
