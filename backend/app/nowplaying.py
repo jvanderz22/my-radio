@@ -9,6 +9,7 @@ flight, which suits Fly's auto-stop machines.
 from __future__ import annotations
 
 import asyncio
+import logging
 from datetime import datetime, timedelta, timezone
 
 import httpx
@@ -24,6 +25,7 @@ from .db import get_db
 from .icy import NowPlaying, fetch_now_playing
 
 router = APIRouter(prefix="/api", tags=["now-playing"])
+logger = logging.getLogger(__name__)
 
 _MAX_BACKOFF = timedelta(minutes=30)
 
@@ -46,7 +48,10 @@ async def now_playing(request: Request, refresh: bool = True):
         for row in await (await db.execute("SELECT id, stream_url FROM stations")).fetchall()
     ]
     if refresh and stations:
-        await _refresh_stale(db, stations)
+        try:
+            await _refresh_stale(db, stations)
+        except Exception:  # noqa: BLE001 - a probing bug should degrade, not 500 the list
+            logger.exception("now-playing refresh failed; serving cached data")
 
     cur = await db.execute(
         """
@@ -64,7 +69,8 @@ async def _refresh_stale(db, stations: list[dict]) -> None:
         row["station_id"]: row
         for row in await (
             await db.execute(
-                "SELECT station_id, status, fetched_at, next_retry_at FROM now_playing"
+                "SELECT station_id, status, fetched_at, next_retry_at, "
+                "consecutive_failures FROM now_playing"
             )
         ).fetchall()
     }
