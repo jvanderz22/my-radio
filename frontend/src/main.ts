@@ -7,7 +7,19 @@ interface Station {
   np_artist: string | null
   np_title: string | null
   np_raw: string | null
+  np_fetched_at: string | null
 }
+
+interface NowPlayingRow {
+  station_id: number
+  status: string
+  artist: string | null
+  title: string | null
+  raw: string | null
+  fetched_at: string | null
+}
+
+const POLL_MS = 20_000
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T
 const statusEl = $('status')
@@ -30,11 +42,19 @@ async function api<T = unknown>(path: string, init: RequestInit = {}): Promise<T
   return (res.status === 204 ? null : await res.json()) as T
 }
 
-function nowPlaying(s: Station): string {
-  if (s.np_artist || s.np_title) {
-    return [s.np_artist, s.np_title].filter(Boolean).join(' — ')
-  }
-  return s.np_raw ?? '—' // real metadata arrives in milestone 3
+function trackText(s: Station): string {
+  if (s.np_artist || s.np_title) return [s.np_artist, s.np_title].filter(Boolean).join(' — ')
+  if (s.np_status === 'no_metadata') return 'no track info'
+  if (s.np_status === 'error') return 'unavailable'
+  return s.np_raw ?? '…'
+}
+
+function ago(iso: string | null): string {
+  if (!iso) return ''
+  const secs = Math.max(0, Math.round((Date.now() - Date.parse(iso)) / 1000))
+  if (secs < 60) return `${secs}s ago`
+  if (secs < 3600) return `${Math.round(secs / 60)}m ago`
+  return `${Math.round(secs / 3600)}h ago`
 }
 
 function play(s: Station): void {
@@ -69,8 +89,12 @@ function render(): void {
       name.className = 'name'
       name.textContent = s.name
       const np = document.createElement('div')
-      np.className = 'np'
-      np.textContent = nowPlaying(s)
+      np.className = `np${s.np_status && s.np_status !== 'ok' ? ' np-dim' : ''}`
+      np.textContent = trackText(s)
+      const when = document.createElement('span')
+      when.className = 'when'
+      when.textContent = ago(s.np_fetched_at)
+      np.append(' ', when)
       meta.append(name, np)
 
       const rename = document.createElement('button')
@@ -83,7 +107,7 @@ function render(): void {
             method: 'PATCH',
             body: JSON.stringify({ name: next }),
           })
-          await refresh()
+          await reloadAll()
         }
       }
 
@@ -94,7 +118,7 @@ function render(): void {
         if (!confirm(`Delete "${s.name}"?`)) return
         if (s.id === playingId) stop()
         await api(`/api/stations/${s.id}`, { method: 'DELETE' })
-        await refresh()
+        await reloadAll()
       }
 
       li.append(playBtn, meta, rename, del)
@@ -103,10 +127,40 @@ function render(): void {
   )
 }
 
-async function refresh(): Promise<void> {
+async function loadStations(): Promise<void> {
+  stations = await api<Station[]>('/api/stations')
+}
+
+async function loadNowPlaying(): Promise<void> {
+  const rows = await api<NowPlayingRow[]>('/api/now-playing')
+  const byId = new Map(rows.map((r) => [r.station_id, r]))
+  for (const s of stations) {
+    const r = byId.get(s.id)
+    s.np_status = r?.status ?? null
+    s.np_artist = r?.artist ?? null
+    s.np_title = r?.title ?? null
+    s.np_raw = r?.raw ?? null
+    s.np_fetched_at = r?.fetched_at ?? null
+  }
+}
+
+/** Full reload: station list + now-playing. Used on load and after mutations. */
+async function reloadAll(): Promise<void> {
   try {
-    stations = await api<Station[]>('/api/stations')
+    await loadStations()
+    render()
+    await loadNowPlaying()
+    render()
     statusEl.textContent = ''
+  } catch (err) {
+    statusEl.textContent = `error: ${(err as Error).message}`
+  }
+}
+
+async function tick(): Promise<void> {
+  if (document.visibilityState !== 'visible') return
+  try {
+    await loadNowPlaying()
     render()
   } catch (err) {
     statusEl.textContent = `error: ${(err as Error).message}`
@@ -118,18 +172,18 @@ addForm.onsubmit = async (e) => {
   try {
     await api('/api/stations', {
       method: 'POST',
-      body: JSON.stringify({
-        name: addName.value.trim(),
-        stream_url: addUrl.value.trim(),
-      }),
+      body: JSON.stringify({ name: addName.value.trim(), stream_url: addUrl.value.trim() }),
     })
     addForm.reset()
     addName.focus()
-    await refresh()
+    await reloadAll()
   } catch (err) {
     statusEl.textContent = `add failed — ${(err as Error).message}`
   }
 }
 
-void refresh()
-setInterval(refresh, 20_000) // milestone 3 makes this refresh live now-playing
+void reloadAll()
+setInterval(tick, POLL_MS)
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') void tick()
+})

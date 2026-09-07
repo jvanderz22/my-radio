@@ -67,7 +67,7 @@ server-side. Manual URL entry is the fallback for stations not in the directory.
 | `POST /api/stations` | add (manual or from search result) | 2 ✅ |
 | `PATCH /api/stations/{id}` · `DELETE /api/stations/{id}` | edit / remove | 2 ✅ |
 | `POST /api/stations/reorder` | drag-reorder | 6 |
-| `GET /api/now-playing` | refresh stale entries concurrently, return all | 3 |
+| `GET /api/now-playing` | refresh stale entries concurrently, return all | 3 ✅ |
 | `GET /api/search?q=&tag=&country=` | proxy Radio-Browser | 5 |
 | `GET /stream/{id}` | audio proxy (StreamingResponse) | 4 |
 
@@ -79,9 +79,12 @@ server-side. Manual URL entry is the fallback for stations not in the directory.
 - [x] **2 — playlist CRUD + frontend.** Add / list / rename / delete stations
   (`app/stations.py` router, Pydantic models, `backend/tests/test_stations.py`).
   Frontend: add form, station list, play/stop via direct stream URL, 20s poll.
-- [ ] **3 — now-playing.** `icy.py` fallback chain + `GET /api/now-playing` with
-  cache + backoff. Frontend list shows current track, auto-refresh every 20s while
-  tab visible.
+- [x] **3 — now-playing.** `app/icy.py` fallback chain (Icecast JSON → Shoutcast
+  v2/v1 → ICY inline) + `app/nowplaying.py` on-demand cache with per-station
+  backoff (`error` → exponential, `no_metadata` → 5 min TTL). `GET /api/now-playing`
+  probes stale entries concurrently (semaphore 8). Frontend merges results into the
+  list, "updated Ns ago", 20s poll gated on tab visibility.
+  _Future: remember which probe worked per station to skip the dead attempts._
 - [ ] **4 — audio proxy.** `GET /stream/{id}`; frontend uses it in prod. Verify on
   Fly with an HTTP-only station.
 - [ ] **5 — Radio-Browser search.** `GET /api/search` + search-to-add UI.

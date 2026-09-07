@@ -7,6 +7,7 @@ from fastapi.staticfiles import StaticFiles
 
 from . import db as db_module
 from .config import FRONTEND_DIST
+from .nowplaying import router as nowplaying_router
 from .stations import router as stations_router
 
 
@@ -21,6 +22,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="my-radio", version="0.1.0", lifespan=lifespan)
 app.include_router(stations_router)
+app.include_router(nowplaying_router)
 
 
 @app.get("/healthz")
