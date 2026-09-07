@@ -4,8 +4,6 @@ interface Station {
   stream_url: string
   homepage_url: string | null
   np_status: string | null
-  np_artist: string | null
-  np_title: string | null
   np_raw: string | null
   np_fetched_at: string | null
 }
@@ -13,8 +11,6 @@ interface Station {
 interface NowPlayingRow {
   station_id: number
   status: string
-  artist: string | null
-  title: string | null
   raw: string | null
   fetched_at: string | null
 }
@@ -43,10 +39,13 @@ async function api<T = unknown>(path: string, init: RequestInit = {}): Promise<T
 }
 
 function trackText(s: Station): string {
-  if (s.np_artist || s.np_title) return [s.np_artist, s.np_title].filter(Boolean).join(' — ')
+  // Shown as-is, never split into artist/title — the "A - B" shape a station
+  // publishes is just as often a show/segment name as a real track credit,
+  // and there's no reliable way to tell those apart.
+  if (s.np_raw) return s.np_raw
   if (s.np_status === 'no_metadata') return 'no track info'
   if (s.np_status === 'error') return 'unavailable'
-  return s.np_raw ?? '…'
+  return '…'
 }
 
 function ago(iso: string | null): string {
@@ -137,8 +136,6 @@ async function loadNowPlaying(): Promise<void> {
   for (const s of stations) {
     const r = byId.get(s.id)
     s.np_status = r?.status ?? null
-    s.np_artist = r?.artist ?? null
-    s.np_title = r?.title ?? null
     s.np_raw = r?.raw ?? null
     s.np_fetched_at = r?.fetched_at ?? null
   }

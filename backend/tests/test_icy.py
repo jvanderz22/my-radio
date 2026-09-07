@@ -1,13 +1,6 @@
 import httpx
 
-from app.icy import fetch_now_playing, split_title
-
-
-def test_split_title():
-    assert split_title("Artist - Song") == ("Artist", "Song")
-    assert split_title("  no separator  ") == (None, "no separator")
-    assert split_title("A - B - C") == ("A", "B - C")
-    assert split_title("") == (None, None)
+from app.icy import fetch_now_playing
 
 
 def _client(handler) -> httpx.AsyncClient:
@@ -34,7 +27,7 @@ async def test_icecast_status_json():
         np = await fetch_now_playing(client, "http://x/stream")
 
     assert np.status == "ok"
-    assert (np.artist, np.title) == ("Boards of Canada", "Roygbiv")
+    assert np.raw == "Boards of Canada - Roygbiv"
 
 
 async def test_shoutcast_v1_7html():
@@ -47,7 +40,7 @@ async def test_shoutcast_v1_7html():
         np = await fetch_now_playing(client, "http://sc.example/;")
 
     assert np.status == "ok"
-    assert (np.artist, np.title) == ("Autechre", "Rae")
+    assert np.raw == "Autechre - Rae"
 
 
 async def test_icy_inline_metadata():
@@ -65,7 +58,7 @@ async def test_icy_inline_metadata():
         np = await fetch_now_playing(client, "http://radio.example/live")
 
     assert np.status == "ok"
-    assert (np.artist, np.title) == ("Aphex Twin", "Xtal")
+    assert np.raw == "Aphex Twin - Xtal"
 
 
 async def test_reachable_but_silent_is_no_metadata():
@@ -78,3 +71,29 @@ async def test_reachable_but_silent_is_no_metadata():
         np = await fetch_now_playing(client, "http://radio.example/live")
 
     assert np.status == "no_metadata"
+
+
+async def test_show_name_is_not_mangled():
+    # Real-world case: a live DJ show publishes its own name, not a track
+    # credit, but it has the same "A - B" shape as "Artist - Track". We must
+    # not guess at a split here — show the string exactly as the station sent it.
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/status-json.xsl":
+            return httpx.Response(
+                200,
+                json={
+                    "icestats": {
+                        "source": {
+                            "listenurl": "https://kathy.torontocast.com:2695/stream",
+                            "title": "Postcards From The Underground - with Mark",
+                        }
+                    }
+                },
+            )
+        return httpx.Response(404)
+
+    async with _client(handler) as client:
+        np = await fetch_now_playing(client, "https://kathy.torontocast.com:2695/stream")
+
+    assert np.status == "ok"
+    assert np.raw == "Postcards From The Underground - with Mark"

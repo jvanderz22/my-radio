@@ -11,8 +11,6 @@ _SELECT = """
     SELECT s.id, s.name, s.stream_url, s.homepage_url, s.favicon_url,
            s.codec, s.bitrate, s.sort_order,
            np.status           AS np_status,
-           np.artist           AS np_artist,
-           np.title            AS np_title,
            np.raw_stream_title AS np_raw,
            np.fetched_at       AS np_fetched_at
     FROM stations s

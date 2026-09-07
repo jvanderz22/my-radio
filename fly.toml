@@ -1,32 +1,34 @@
-# fly.toml — my-radio
-app = "my-radio"
-primary_region = "iad"
+# fly.toml app configuration file generated for my-radio on 2026-09-07T17:40:30-05:00
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
+
+app = 'my-radio'
+primary_region = 'iad'
 
 [build]
-  dockerfile = "Dockerfile"
+  dockerfile = 'Dockerfile'
 
 [env]
-  DATA_DIR = "/data"
-  PORT = "8080"
+  DATA_DIR = '/data'
+  PORT = '8080'
 
-# SQLite lives here. Keep the app at ONE machine (`fly scale count 1`):
-# Fly volumes don't replicate, so a second machine gets its own empty copy.
 [[mounts]]
-  source = "radio_data"
-  destination = "/data"
+  source = 'radio_data'
+  destination = '/data'
 
 [http_service]
   internal_port = 8080
   force_https = true
-  auto_stop_machines = "stop"
+  auto_stop_machines = 'stop'
   auto_start_machines = true
   min_machines_running = 0
 
   [http_service.concurrency]
-    type = "requests"
+    type = 'requests'
     hard_limit = 50
     soft_limit = 25
 
 [[vm]]
-  size = "shared-cpu-1x"
-  memory = "512mb"
+  size = 'shared-cpu-1x'
+  memory = '512mb'

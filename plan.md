@@ -40,7 +40,11 @@ over HTTP the frontend can point `<audio>` straight at the source.
    abort the socket. ~8s timeout.
 4. None of the above → `status = no_metadata`, still playable.
 
-Split `raw_stream_title` on ` - ` for artist/title (best-effort). Per-station
+`raw_stream_title` is shown verbatim, never split into artist/title: the same
+`"A - B"` shape a station publishes is just as often a show/segment name (e.g.
+a DJ show titled `"Postcards From The Underground - with Mark"`) as a real
+`"Artist - Track"` credit, and there's no reliable way to tell them apart —
+guessing wrong mangles the show name, so we don't guess. Per-station
 exponential backoff via `consecutive_failures` / `next_retry_at`.
 
 ### Radio-Browser for discovery
@@ -53,10 +57,10 @@ server-side. Manual URL entry is the fallback for stations not in the directory.
 
 - **stations** — id, name, stream_url, homepage_url, favicon_url, codec, bitrate,
   radio_browser_uuid, sort_order, created_at
-- **now_playing** — station_id (PK/FK), raw_stream_title, artist, title, status
-  (`unknown`|`ok`|`no_metadata`|`error`), fetched_at, consecutive_failures,
-  next_retry_at
-- *(v2)* **track_history** — station_id, artist, title, first_seen, last_seen
+- **now_playing** — station_id (PK/FK), raw_stream_title (shown verbatim, never
+  split), status (`unknown`|`ok`|`no_metadata`|`error`), fetched_at,
+  consecutive_failures, next_retry_at
+- *(v2)* **track_history** — station_id, raw_stream_title, first_seen, last_seen
 
 ## Endpoints
 

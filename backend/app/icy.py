@@ -24,24 +24,16 @@ _TAG_RE = re.compile(r"<[^>]+>")
 class NowPlaying:
     status: str  # "ok" | "no_metadata" | "error"
     raw: Optional[str] = None
-    artist: Optional[str] = None
-    title: Optional[str] = None
     detail: Optional[str] = None
 
 
-def split_title(raw: str) -> tuple[Optional[str], Optional[str]]:
-    """`"Artist - Track"` -> `("Artist", "Track")`; no separator -> `(None, raw)`."""
-    raw = raw.strip()
-    if " - " in raw:
-        artist, title = raw.split(" - ", 1)
-        return (artist.strip() or None), (title.strip() or None)
-    return None, (raw or None)
-
-
 def _ok(raw: str) -> NowPlaying:
-    raw = raw.strip()
-    artist, title = split_title(raw)
-    return NowPlaying(status="ok", raw=raw, artist=artist, title=title)
+    # Deliberately not split into artist/title: the same "A - B" shape covers
+    # real "Artist - Track" credits *and* show/segment names (e.g. a DJ show
+    # publishing "Postcards From The Underground - with Mark"), and there's no
+    # reliable way to tell them apart. Showing the raw string is never wrong;
+    # guessing at a split sometimes mangles a show name into nonsense.
+    return NowPlaying(status="ok", raw=raw.strip())
 
 
 def _base_url(stream_url: str) -> str:

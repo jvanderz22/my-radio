@@ -50,7 +50,7 @@ async def now_playing(request: Request, refresh: bool = True):
 
     cur = await db.execute(
         """
-        SELECT station_id, status, artist, title, raw_stream_title AS raw,
+        SELECT station_id, status, raw_stream_title AS raw,
                fetched_at, consecutive_failures
         FROM now_playing
         """
@@ -111,19 +111,17 @@ async def _upsert(db, station_id: int, np: NowPlaying, now: datetime, cached) ->
         await db.execute(
             """
             INSERT INTO now_playing
-                (station_id, raw_stream_title, artist, title, status,
+                (station_id, raw_stream_title, status,
                  fetched_at, consecutive_failures, next_retry_at)
-            VALUES (?, ?, ?, ?, 'ok', ?, 0, NULL)
+            VALUES (?, ?, 'ok', ?, 0, NULL)
             ON CONFLICT(station_id) DO UPDATE SET
                 raw_stream_title = excluded.raw_stream_title,
-                artist = excluded.artist,
-                title = excluded.title,
                 status = 'ok',
                 fetched_at = excluded.fetched_at,
                 consecutive_failures = 0,
                 next_retry_at = NULL
             """,
-            (station_id, np.raw, np.artist, np.title, iso),
+            (station_id, np.raw, iso),
         )
         return
 
