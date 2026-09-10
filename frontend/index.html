@@ -4,33 +4,21 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>my-radio</title>
-    <link rel="stylesheet" href="/src/style.css" />
+    <script>
+      // Set the theme before first paint to avoid a flash of the wrong one.
+      try {
+        var stored = localStorage.getItem('my-radio:theme')
+        var dark = stored
+          ? stored === 'dark'
+          : window.matchMedia('(prefers-color-scheme: dark)').matches
+        document.documentElement.dataset.theme = dark ? 'dark' : 'light'
+      } catch (e) {
+        document.documentElement.dataset.theme = 'light'
+      }
+    </script>
   </head>
   <body>
-    <main id="app">
-      <h1>my-radio</h1>
-      <p id="status" class="status"></p>
-
-      <form id="add-form" class="add">
-        <input id="add-name" placeholder="Station name" required />
-        <input id="add-url" type="url" placeholder="https://stream-url…" required />
-        <button type="submit">Add</button>
-      </form>
-
-      <ul id="stations" class="stations"></ul>
-      <p id="empty" class="empty" hidden>No stations yet — add one above.</p>
-
-      <section id="history-section" hidden>
-        <h2>Recently played</h2>
-        <ul id="history-list" class="history"></ul>
-      </section>
-
-      <audio id="player" class="player" controls preload="none"></audio>
-      <p class="hint">
-        Hotkeys: <kbd>space</kbd> play/pause · <kbd>←</kbd>/<kbd>→</kbd> previous/next station ·
-        <kbd>↑</kbd>/<kbd>↓</kbd> volume
-      </p>
-    </main>
-    <script type="module" src="/src/main.ts"></script>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

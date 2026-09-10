@@ -8,7 +8,7 @@ playing*, click one to play it.
 | Layer | Choice |
 |---|---|
 | Backend | Python, **FastAPI** + uvicorn, `httpx` (outbound), `aiosqlite` |
-| Frontend | **Vite + vanilla TypeScript** (no framework), built into `backend/static/` |
+| Frontend | **Vite + React + TypeScript**, **Tailwind CSS v4**, built into `backend/static/` |
 | DB | **SQLite** at `$DATA_DIR/radio.db` (Fly volume in prod) |
 | Deploy | 2-stage Dockerfile (node build → python runtime), **Fly.io**, single machine + volume |
 

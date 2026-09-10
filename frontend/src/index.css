@@ -1,0 +1,31 @@
+@import 'tailwindcss';
+
+/* Theme is toggled by a [data-theme] attribute on <html> (see index.html and
+   useTheme), rather than the OS setting alone. */
+@custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
+
+:root {
+  color-scheme: light;
+}
+[data-theme='dark'] {
+  color-scheme: dark;
+}
+
+body {
+  margin: 0;
+  background: #fafafa;
+  color: #171717;
+}
+[data-theme='dark'] body {
+  background: #0a0a0a;
+  color: #fafafa;
+}
+
+/* Tint the native <audio> controls so the player bar reads as one piece. */
+audio {
+  width: 100%;
+  height: 2.25rem;
+}
+[data-theme='dark'] audio {
+  color-scheme: dark;
+}
