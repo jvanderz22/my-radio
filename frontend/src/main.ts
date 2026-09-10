@@ -25,6 +25,7 @@ const POLL_MS = 20_000
 const HISTORY_KEY = 'my-radio:history'
 const HISTORY_LIMIT = 50
 const VOLUME_STEP = 0.05
+const BASE_TITLE = document.title // restored to this when nothing is playing
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T
 const statusEl = $('status')
@@ -164,6 +165,18 @@ function renderHistory(): void {
 
 // --- station list ---
 
+/** Reflects the current station and track in the browser tab title, so a
+ * backgrounded tab shows what's playing. Reverts to BASE_TITLE when stopped. */
+function updateDocumentTitle(): void {
+  const s = playingId === null ? undefined : stations.find((st) => st.id === playingId)
+  if (!s) {
+    document.title = BASE_TITLE
+    return
+  }
+  const label = s.np_status === 'ok' && s.np_raw ? `${s.np_raw} — ${s.name}` : s.name
+  document.title = `${player.paused ? '⏸' : '▶'} ${label}`
+}
+
 function render(): void {
   emptyEl.hidden = stations.length > 0
   listEl.replaceChildren(
@@ -228,6 +241,7 @@ function render(): void {
       return li
     }),
   )
+  updateDocumentTitle()
 }
 
 async function loadStations(): Promise<void> {
@@ -259,8 +273,17 @@ async function reloadAll(): Promise<void> {
   }
 }
 
+/** True while a station is actually producing sound in this tab. */
+function isPlaying(): boolean {
+  return playingId !== null && !player.paused && !player.ended
+}
+
 async function tick(): Promise<void> {
-  if (document.visibilityState !== 'visible') return
+  // Normally we skip polling for a hidden tab to save work, but keep going while
+  // audio is playing so the now-playing list and history stay fresh in the
+  // background. Browsers don't apply the once-a-minute background timer throttle
+  // to tabs that are actively producing sound, so the interval keeps its cadence.
+  if (document.visibilityState !== 'visible' && !isPlaying()) return
   try {
     await loadNowPlaying()
     recordHistory()
