@@ -31,6 +31,29 @@ def test_station_crud():
         assert client.get("/api/stations").json() == []
 
 
+def test_reorder():
+    with TestClient(app) as client:
+        ids = [
+            client.post("/api/stations", json={"name": n, "stream_url": SOMA}).json()["id"]
+            for n in ("A", "B", "C")
+        ]
+        assert [s["id"] for s in client.get("/api/stations").json()] == ids
+
+        want = [ids[2], ids[0], ids[1]]
+        r = client.post("/api/stations/reorder", json={"ids": want})
+        assert r.status_code == 200
+        assert [s["id"] for s in r.json()] == want
+        assert [s["id"] for s in client.get("/api/stations").json()] == want
+
+        # must list every station exactly once
+        assert client.post("/api/stations/reorder", json={"ids": ids[:2]}).status_code == 400
+        assert client.post("/api/stations/reorder", json={"ids": ids + [999]}).status_code == 400
+        assert client.post("/api/stations/reorder", json={"ids": [ids[0]] * 3}).status_code == 400
+
+        for sid in ids:
+            client.delete(f"/api/stations/{sid}")
+
+
 def test_bad_input():
     with TestClient(app) as client:
         # non-http stream URL is rejected

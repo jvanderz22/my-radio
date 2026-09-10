@@ -30,6 +30,11 @@ class StationCreate(BaseModel):
     _v_favicon = field_validator("favicon_url")(_http_url)
 
 
+class StationsReorder(BaseModel):
+    # The full set of station ids in the desired order; sort_order becomes the index.
+    ids: list[int] = Field(min_length=1)
+
+
 class StationUpdate(BaseModel):
     name: Optional[str] = Field(default=None, min_length=1, max_length=200)
     stream_url: Optional[str] = Field(default=None, min_length=1, max_length=2000)

@@ -3,7 +3,7 @@ from __future__ import annotations
 from fastapi import APIRouter, HTTPException, Request
 
 from .db import get_db
-from .models import StationCreate, StationUpdate
+from .models import StationCreate, StationsReorder, StationUpdate
 
 router = APIRouter(prefix="/api/stations", tags=["stations"])
 
@@ -58,6 +58,24 @@ async def create_station(request: Request, body: StationCreate):
     )
     await db.commit()
     return await _get_one(db, cur.lastrowid)
+
+
+@router.post("/reorder")
+async def reorder_stations(request: Request, body: StationsReorder):
+    db = get_db(request)
+    cur = await db.execute("SELECT id FROM stations")
+    existing = {row[0] for row in await cur.fetchall()}
+    if len(body.ids) != len(existing) or set(body.ids) != existing:
+        raise HTTPException(
+            status_code=400, detail="ids must list every current station exactly once"
+        )
+    await db.executemany(
+        "UPDATE stations SET sort_order = ? WHERE id = ?",
+        [(order, sid) for order, sid in enumerate(body.ids)],
+    )
+    await db.commit()
+    cur = await db.execute(_SELECT + " ORDER BY s.sort_order, s.id")
+    return [dict(row) for row in await cur.fetchall()]
 
 
 @router.patch("/{station_id}")

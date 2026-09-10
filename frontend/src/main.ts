@@ -180,10 +180,24 @@ function updateDocumentTitle(): void {
 function render(): void {
   emptyEl.hidden = stations.length > 0
   listEl.replaceChildren(
-    ...stations.map((s) => {
+    ...stations.map((s, idx) => {
       const li = document.createElement('li')
       const isCurrent = s.id === playingId
       li.className = isCurrent ? 'playing' : ''
+
+      const up = document.createElement('button')
+      up.textContent = '↑'
+      up.className = 'ghost'
+      up.title = 'Move up'
+      up.disabled = idx === 0
+      up.onclick = () => void moveStation(s.id, -1)
+
+      const down = document.createElement('button')
+      down.textContent = '↓'
+      down.className = 'ghost'
+      down.title = 'Move down'
+      down.disabled = idx === stations.length - 1
+      down.onclick = () => void moveStation(s.id, 1)
 
       const playBtn = document.createElement('button')
       const isPaused = isCurrent && player.paused
@@ -237,11 +251,36 @@ function render(): void {
         stopBtn.onclick = () => stop()
         li.append(stopBtn)
       }
-      li.append(meta, rename, del)
+      li.append(meta, up, down, rename, del)
       return li
     }),
   )
   updateDocumentTitle()
+}
+
+/** Moves a station up (-1) or down (+1), persisting the new order. Optimistic:
+ * the list re-renders immediately, then reconciles with the server's response. */
+async function moveStation(id: number, delta: number): Promise<void> {
+  const from = stations.findIndex((s) => s.id === id)
+  const to = from + delta
+  if (from === -1 || to < 0 || to >= stations.length) return
+
+  const reordered = stations.slice()
+  const [moved] = reordered.splice(from, 1)
+  reordered.splice(to, 0, moved)
+  stations = reordered
+  render()
+
+  try {
+    stations = await api<Station[]>('/api/stations/reorder', {
+      method: 'POST',
+      body: JSON.stringify({ ids: reordered.map((s) => s.id) }),
+    })
+    render()
+  } catch (err) {
+    setStatus(`reorder failed — ${(err as Error).message}`)
+    await reloadAll()
+  }
 }
 
 async function loadStations(): Promise<void> {
