@@ -11,10 +11,10 @@ Usage:
 
 Environment variables also work; put them in a gitignored .env next to this
 script and they'll be picked up automatically (command-line flags win):
-  APP_NAME=my-radio REGION=iad ./deploy_fly.sh
+  APP_NAME=driftwave REGION=iad ./deploy_fly.sh
 
 Optional:
-  --app-name       default: my-radio     (must match fly.toml's `app`)
+  --app-name       default: driftwave    (must match fly.toml's `app`)
   --region         default: iad
   --volume-name    default: radio_data   (must match fly.toml's mount source)
   --volume-size    default: 1  (GB — the DB is tiny; bump only if you add track history)
@@ -42,7 +42,7 @@ if [[ -f "$(dirname "$0")/.env" ]]; then
   set +a
 fi
 
-APP_NAME="${APP_NAME:-my-radio}"
+APP_NAME="${APP_NAME:-driftwave}"
 REGION="${REGION:-iad}"
 VOLUME_NAME="${VOLUME_NAME:-radio_data}"
 VOLUME_SIZE="${VOLUME_SIZE:-1}"
